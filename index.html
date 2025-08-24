@@ -10,14 +10,14 @@
             margin: 0;
             padding: 0;
             background: #87CEEB;
-            font-family: Arial, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
+            font-family: Arial, sans-serif;
         }
         #game-container {
-            border: 4px solid #FFD700;
+            border: 3px solid #FFD700;
             border-radius: 10px;
         }
     </style>
@@ -26,43 +26,23 @@
     <div id="game-container"></div>
     
     <script>
-        console.log('Script iniciado');
-        
-        class SimpleGame extends Phaser.Scene {
+        class GameScene extends Phaser.Scene {
             constructor() {
-                super({ key: 'SimpleGame' });
+                super({ key: 'GameScene' });
                 this.score = 0;
-                console.log('Construtor da cena executado');
             }
 
             create() {
-                console.log('Create() executado');
-                
-                // Fundo azul simples
+                // Fundo azul
                 this.add.rectangle(400, 300, 800, 600, 0x87CEEB);
                 
-                // Texto de teste
-                this.add.text(400, 100, 'JOGO FUNCIONANDO!', {
-                    fontSize: '32px',
+                // Título
+                this.add.text(400, 80, 'PEGUE OS OBJETOS!', {
+                    fontSize: '28px',
                     fill: '#FFFFFF',
                     stroke: '#000000',
                     strokeThickness: 2
                 }).setOrigin(0.5);
-                
-                // Instruções
-                this.add.text(400, 150, 'Use setas ← → para mover', {
-                    fontSize: '20px',
-                    fill: '#FFFFFF'
-                }).setOrigin(0.5);
-                
-                // Cesta (retângulo simples)
-                this.basket = this.add.rectangle(400, 550, 80, 30, 0x8B4513);
-                this.physics.add.existing(this.basket);
-                this.basket.body.setCollideWorldBounds(true);
-                this.basket.body.setImmovable(true);
-                
-                // Grupo para objetos que caem (sem física)
-                this.fallingItems = this.add.group();
                 
                 // Pontuação
                 this.scoreText = this.add.text(20, 20, 'Pontos: 0', {
@@ -72,99 +52,92 @@
                     strokeThickness: 2
                 });
                 
+                // Cesta
+                this.basket = this.add.rectangle(400, 520, 80, 30, 0x8B4513);
+                this.physics.add.existing(this.basket);
+                this.basket.body.setImmovable(true);
+                
+                // Grupo de objetos
+                this.items = [];
+                
                 // Controles
                 this.cursors = this.input.keyboard.createCursorKeys();
                 
-                // Controle por clique/toque
+                // Mouse/touch
                 this.input.on('pointerdown', (pointer) => {
                     this.basket.x = Phaser.Math.Clamp(pointer.x, 50, 750);
                 });
                 
+                this.input.on('pointermove', (pointer) => {
+                    if (pointer.isDown) {
+                        this.basket.x = Phaser.Math.Clamp(pointer.x, 50, 750);
+                    }
+                });
+                
                 // Timer para criar objetos
-                this.itemTimer = this.time.addEvent({
-                    delay: 2000, // 2 segundos
-                    callback: this.createFallingItem,
+                this.time.addEvent({
+                    delay: 2000,
+                    callback: this.createItem,
                     callbackScope: this,
                     loop: true
                 });
                 
-                // Criar primeiro objeto imediatamente para teste
-                this.createFallingItem();
-                
-                console.log('Tudo configurado!');
+                // Criar primeiro objeto
+                this.createItem();
             }
             
-            createFallingItem() {
-                const x = Phaser.Math.Between(50, 750);
+            createItem() {
                 const colors = [0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00, 0xFF00FF];
                 const color = Phaser.Utils.Array.GetRandom(colors);
+                const x = Phaser.Math.Between(50, 750);
                 
-                // Criar círculo colorido SEM física - movimento manual
-                const item = this.add.circle(x, 50, 20, color); // Começar em y=50 para ver
-                
-                // Adicionar propriedades customizadas
+                const item = this.add.circle(x, 50, 20, color);
                 item.speed = 2;
-                item.isActive = true;
                 
-                this.fallingItems.add(item);
-                
-                console.log('Item criado na posição:', x, 'y:', item.y, 'cor:', color.toString(16));
+                this.items.push(item);
             }
             
             update() {
-                // Movimento da cesta
+                // Mover cesta com teclado
                 if (this.cursors.left.isDown) {
-                    this.basket.x -= 5;
+                    this.basket.x -= 6;
                 }
                 if (this.cursors.right.isDown) {
-                    this.basket.x += 5;
+                    this.basket.x += 6;
                 }
                 
                 // Manter cesta na tela
                 this.basket.x = Phaser.Math.Clamp(this.basket.x, 50, 750);
                 
-                // Mover itens manualmente
-                this.fallingItems.children.entries.forEach(item => {
-                    if (item.isActive) {
-                        item.y += item.speed;
+                // Mover objetos
+                for (let i = this.items.length - 1; i >= 0; i--) {
+                    const item = this.items[i];
+                    item.y += item.speed;
+                    
+                    // Verificar colisão
+                    const distance = Phaser.Math.Distance.Between(
+                        item.x, item.y, this.basket.x, this.basket.y
+                    );
+                    
+                    if (distance < 45) {
+                        // Capturou!
+                        this.score += 10;
+                        this.scoreText.setText('Pontos: ' + this.score);
+                        this.cameras.main.flash(200, 255, 255, 255);
                         
-                        console.log('Item movendo - x:', Math.floor(item.x), 'y:', Math.floor(item.y));
-                        
-                        // Verificar colisão simples
-                        const distance = Phaser.Math.Distance.Between(
-                            item.x, item.y,
-                            this.basket.x, this.basket.y
-                        );
-                        
-                        if (distance < 40) {
-                            console.log('COLISÃO DETECTADA!');
-                            this.catchItem(item);
-                        }
-                        
-                        // Remover se saiu da tela
-                        if (item.y > 650) {
-                            console.log('Item saiu da tela');
-                            item.destroy();
-                        }
+                        item.destroy();
+                        this.items.splice(i, 1);
                     }
-                });
-            }
-            
-            catchItem(item) {
-                console.log('Item capturado!');
-                
-                // Efeito visual simples
-                this.cameras.main.flash(200, 255, 255, 255);
-                
-                this.score += 10;
-                this.scoreText.setText('Pontos: ' + this.score);
-                
-                item.isActive = false;
-                item.destroy();
+                    else if (item.y > 650) {
+                        // Saiu da tela
+                        item.destroy();
+                        this.items.splice(i, 1);
+                    }
+                }
             }
         }
 
-        // Configuração básica do Phaser
+        // Configuração simples
         const config = {
             type: Phaser.AUTO,
             width: 800,
@@ -174,16 +147,14 @@
             physics: {
                 default: 'arcade',
                 arcade: {
-                    gravity: { y: 0 },
-                    debug: false
+                    gravity: { y: 0 }
                 }
             },
-            scene: SimpleGame
+            scene: GameScene
         };
 
-        console.log('Iniciando Phaser...');
+        // Iniciar
         const game = new Phaser.Game(config);
-        console.log('Phaser iniciado');
     </script>
 </body>
 </html>
